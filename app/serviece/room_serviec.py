@@ -2,7 +2,8 @@ from fastapi import HTTPException,status
 from sqlalchemy.orm import Session
 from app.model.room_modle import Room
 from app.model.player_model import Player
-import uuid
+from app.model.round_model import Round
+from app.dto.inputs import User
 import random
 import string
 import logging
@@ -28,7 +29,8 @@ def roomcreate(name:str,db:Session):
        db.add(room)
        db.commit()
        db.refresh(room)
-       return code
+       return {"status":200,
+               "code":code}
         
      except HTTPException:
         raise    
@@ -65,7 +67,8 @@ def join_room(code:str,name:str,db:Session):
      db.commit()
      db.refresh(player)
 
-     return player
+     return {"status":200,
+               "player":player}
      
 
    except HTTPException:
@@ -81,3 +84,77 @@ def join_room(code:str,name:str,db:Session):
                "message": "Server failure"
            }
        )
+
+
+def question_service(code:str,db:Session):
+    try:
+      room=db.query(Room).filter(Room.code==code).first()
+      if not room:
+              raise HTTPException(
+                  status_code=404,
+                  detail="Room not found"
+              )
+      round=db.query(Round).filter(Round.room_id==room.id).first()
+
+      return{
+          "status":200,
+          "data":{"id":round.id,
+                  "question":round.question}
+      }
+    except HTTPException:
+        raise
+    except Exception as e:
+              
+               logger.error(" error for api question get: %s", e, exc_info=True) 
+               raise HTTPException(
+               status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+               detail={
+                   "success": False,
+                   "error": "SERVER_ERROR",
+                   "message": "Server failure"
+               }
+           )
+
+
+    
+def inputquestion_service(code:str,user:User,db:Session):
+    try:
+        room=db.query(Room).filter(Room.code==code).first()
+        if not room:
+                      raise HTTPException(
+                          status_code=404,
+                          detail="Room not found")
+       
+
+        round=Round(
+              
+               question=user.question,
+               room_id=room.id
+             
+        )
+
+        db.add(round)
+        db.commit()
+        db.refresh(round)
+        return {
+             "status_code":200,
+             "message":"question inputed"
+        }
+
+       
+
+
+    except HTTPException:
+            raise
+    except Exception as e:
+               db.rollback()
+               logger.error(" error for api question input: %s", e, exc_info=True) 
+               raise HTTPException(
+               status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+               detail={
+                   "success": False,
+                   "error": "SERVER_ERROR",
+                   "message": "Server failure"
+               }
+           )
+    
